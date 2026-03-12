@@ -35,7 +35,7 @@ __module_version__ = "0.1.0"
 __module_description__ = "Upload a file to a 0x0.st-compatible host and paste the returned URL into chat"
 
 DEFAULT_ENDPOINT = "https://0x0.st"
-USER_AGENT = "hexchat-0x0-share/0.1.0"
+USER_AGENT = "zoitechat-0x0-share/0.1.0"
 PREF_KEY_ENDPOINT = "x0share_endpoint"
 RESULTS = queue.Queue()
 
