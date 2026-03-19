@@ -504,10 +504,10 @@ def _register_menus():
     _menu_add('$TAB/Share File via 0x0...', '0X0SHARE')
     _menu_add('$CHAN/Share File via 0x0...', '0X0SHARE')
 
-    _menu_add('0x0 Share')
-    _menu_add('0x0 Share/Share File...', '0X0SHARE')
-    _menu_add('0x0 Share/Preferences...', '0X0SHARECONF')
-    _menu_add('0x0 Share/Reset Host to Default', '0X0SHARERESET')
+    # _menu_add('0x0 Share')
+    # _menu_add('0x0 Share/Share File...', '0X0SHARE')
+    # _menu_add('0x0 Share/Preferences...', '0X0SHARECONF')
+    # _menu_add('0x0 Share/Reset Host to Default', '0X0SHARERESET')
 
 
 hexchat.hook_command(
