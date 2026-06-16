@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-0x0 Share plugin compatible with HexChat / ZoiteChat.
+x0.at Share plugin compatible with HexChat / ZoiteChat.
 
-- Right-click tab menu entry: Share File via 0x0...
+- Right-click tab menu entry: Share File...
 - Main menu entries: Share File, Preferences, Reset Host
-- Configurable 0x0-compatible endpoint stored in plugin preferences
-- Uploads selected file to configured 0x0-style instance
+- Configurable x0.at / 0x0-compatible endpoint stored in plugin preferences
+- Uploads selected file to configured x0.at-style instance
 - Sends returned URL into the tab where the action was started
 """
 
@@ -31,11 +31,12 @@ except ImportError:
 import hexchat
 
 __module_name__ = "0x0 Share"
-__module_version__ = "0.1.0"
-__module_description__ = "Upload a file to a 0x0.st-compatible host and paste the returned URL into chat"
+__module_version__ = "0.1.1"
+__module_description__ = "Upload a file to x0.at or another compatible host and paste the returned URL into chat"
 
-DEFAULT_ENDPOINT = "https://0x0.st"
-USER_AGENT = "zoitechat-0x0-share/0.1.0"
+DEFAULT_ENDPOINT = "https://x0.at"
+LEGACY_DEFAULT_ENDPOINTS = frozenset(("https://0x0.st", "http://0x0.st"))
+USER_AGENT = "zoitechat-x0-share/0.1.1"
 PREF_KEY_ENDPOINT = "x0share_endpoint"
 RESULTS = queue.Queue()
 
@@ -108,9 +109,16 @@ def _get_endpoint():
         return DEFAULT_ENDPOINT
 
     try:
-        return _normalize_endpoint(stored)
+        endpoint = _normalize_endpoint(stored)
     except ValueError:
         return DEFAULT_ENDPOINT
+
+    # Move users who only had the old built-in default saved over to x0.at,
+    # while preserving any intentionally configured custom compatible host.
+    if endpoint in LEGACY_DEFAULT_ENDPOINTS:
+        return DEFAULT_ENDPOINT
+
+    return endpoint
 
 
 
@@ -207,7 +215,7 @@ def _choose_file():
 
 
 def _preferences_with_gtk():
-    dialog = Gtk.Dialog(title='0x0 Share Preferences')
+    dialog = Gtk.Dialog(title='x0.at Share Preferences')
     dialog.set_modal(True)
     dialog.add_buttons(
         Gtk.STOCK_CANCEL,
@@ -220,14 +228,14 @@ def _preferences_with_gtk():
     box.set_spacing(8)
     box.set_border_width(12)
 
-    label = Gtk.Label(label='0x0-compatible upload host:')
+    label = Gtk.Label(label='x0.at / 0x0-compatible upload host:')
     label.set_xalign(0.0)
     entry = Gtk.Entry()
     entry.set_text(_get_endpoint())
     entry.set_activates_default(True)
     dialog.set_default_response(Gtk.ResponseType.OK)
 
-    example = Gtk.Label(label='Example: https://0x0.st')
+    example = Gtk.Label(label='Example: https://x0.at')
     example.set_xalign(0.0)
 
     box.add(label)
@@ -250,8 +258,8 @@ def _preferences_with_tk():
     root.withdraw()
     root.update_idletasks()
     value = simpledialog.askstring(
-        '0x0 Share Preferences',
-        '0x0-compatible upload host:',
+        'x0.at Share Preferences',
+        'x0.at / 0x0-compatible upload host:',
         initialvalue=_get_endpoint(),
         parent=root,
     )
@@ -516,17 +524,17 @@ def _register_menus():
 hexchat.hook_command(
     '0X0SHARE',
     cmd_share,
-    help='Usage: /0X0SHARE [full-path] - Upload a file to the configured 0x0-compatible host and send the URL to the current tab.',
+    help='Usage: /0X0SHARE [full-path] - Upload a file to x0.at or the configured compatible host and send the URL to the current tab.',
 )
 hexchat.hook_command(
     '0X0SHAREHOST',
     cmd_host,
-    help='Usage: /0X0SHAREHOST [url] - Show or set the 0x0-compatible upload host.',
+    help='Usage: /0X0SHAREHOST [url] - Show or set the x0.at / 0x0-compatible upload host.',
 )
 hexchat.hook_command(
     '0X0SHARECONF',
     cmd_preferences,
-    help='Usage: /0X0SHARECONF - Open the 0x0 Share preferences dialog.',
+    help='Usage: /0X0SHARECONF - Open the x0.at Share preferences dialog.',
 )
 hexchat.hook_command(
     '0X0SHARERESET',
@@ -537,4 +545,4 @@ hexchat.hook_timer(250, _process_results)
 hexchat.hook_unload(unload_cb)
 
 _register_menus()
-_plugin_print('Loaded. Right-click a tab and choose “Share File via 0x0...”. Current host: {}'.format(_get_endpoint()))
+_plugin_print('Loaded. Right-click a tab and choose “0x0 Share > Share File...”. Current host: {}'.format(_get_endpoint()))
