@@ -31,7 +31,6 @@
 ##     behaviour was encountered where a caught event would be treated normally anyway, even
 ##     though our callback returned EAT_XCHAT or EAT_ALL. I don't know how to solve that.
 ##
-# TODO: switch from pickle to json, and use hexchat.set_pluginpref
 from __future__ import print_function
 
 __module_name__ = "nicenicks"
@@ -39,8 +38,7 @@ __module_version__ = "0.09"
 __module_description__ = "Sweet-ass nick colouring."
 
 from collections import defaultdict
-import os
-import pickle
+import json
 import hexchat
 
 ######## GLOBALIZATION ########
@@ -54,13 +52,14 @@ debug_enabled = set()
 
 # You can edit the following default colour table if you want the addon to use fewer colours
 # (or more colours -- I left out all the ugly ones. :) The first colour in the table gets used first.
-defaultcolortable = [ (11, None), (4, None), (13, None), (7, None), (8, None), (9, None), (10, None), (3, None), (12, None), (6, None), (14, None), (15, None) ]
+DEFAULT_COLORS = (11, 4, 13, 7, 8, 9, 10, 3, 12, 6, 14, 15) + tuple(range(16, 100))
+defaultcolortable = [(color, None) for color in DEFAULT_COLORS]
+MAX_COLOR = 99
 
 chancolortable = {}
 permacolortable = {}
 
-datafile = os.path.join(hexchat.get_info("configdir"), "nicenicks.dat")
-# Default behaviour before v0.07 was to create file in current working directory (most likely the user's home directory).
+PREF_KEY_COLORS = "nicenicks_colors"
 
 ec = defaultdict(str)
 
@@ -92,10 +91,11 @@ def ecs(series):
 
 
 def col(foreground, background=None):
+    foreground = max(0, min(MAX_COLOR, int(foreground)))
     if background is not None:
+        background = max(0, min(MAX_COLOR, int(background)))
         return ec["c"] + str(foreground).zfill(2) + "," + str(background).zfill(2)
-    else:
-        return ec["c"] + str(foreground).zfill(2)
+    return ec["c"] + str(foreground).zfill(2)
 
 def dmsg(msg, desc="DEBUG", prefix="(nn) "):
     "Debug message -- Print 'msg' if debugging is enabled."
@@ -105,6 +105,31 @@ def dmsg(msg, desc="DEBUG", prefix="(nn) "):
 def omsg(msg, desc="Info", prefix="(nn) "):
     "Other message -- Print 'msg', with 'desc' in column."
     jprint(ecs("b"), str(prefix), str(desc), ecs("bt"), str(msg))
+
+def load_colors():
+    stored = hexchat.get_pluginpref(PREF_KEY_COLORS)
+    if not stored:
+        return {}
+    try:
+        colors = json.loads(stored)
+    except (TypeError, ValueError):
+        return {}
+    if not isinstance(colors, dict):
+        return {}
+    clean = {}
+    for nick, color in colors.items():
+        try:
+            color = int(color)
+        except (TypeError, ValueError):
+            continue
+        nick = str(nick).strip().lower()
+        if nick and 0 <= color <= MAX_COLOR:
+            clean[nick] = color
+    return clean
+
+def save_colors():
+    if not hexchat.set_pluginpref(PREF_KEY_COLORS, json.dumps(permacolortable, sort_keys=True)):
+        raise RuntimeError("Failed to save colour mappings.")
 
 def get_color(ctable, nick):
     """Returns the color that 'nick' should get, given the colour table 'ctable' (reusing
@@ -162,7 +187,7 @@ def get_color(ctable, nick):
 def color_table_command(word, word_eol, userdata):
     "Prints a color table."
 
-    for color in range(32):
+    for color in range(MAX_COLOR + 1):
         jprint(ecs("o"), "Color #", str(color), "\t", col(color), "COLOR!")
 
     return hexchat.EAT_ALL
@@ -193,6 +218,10 @@ def setcolor_command(word, word_eol, userdata):
         nick = nick[1:] # get rid of that - at the beginning
         if nick in permacolortable:
             permacolortable.pop(nick)
+            try:
+                save_colors()
+            except RuntimeError as e:
+                omsg(e, "ERR_SAVE")
             omsg("Removed "+nick+" from color table", "BALEETED")
         else:
             omsg(nick+" ain't in dere, bey!", "ERRN0R")
@@ -208,9 +237,13 @@ def setcolor_command(word, word_eol, userdata):
 
     elif paramcount == 2: # nick and parameter supplied
 
-        color = int(word[2]) # get the color
+        try:
+            color = int(word[2])
+        except ValueError:
+            omsg("Not a valid colour! Please pick one between 0 and 99.", "ERROR")
+            return hexchat.EAT_ALL
 
-        if 0 <= color <= 31:
+        if 0 <= color <= MAX_COLOR:
             # give it a new color
             permacolortable[nick] = color
             omsg("".join(["New color -> ", col(color), nick, ecs("o")]), "SETCOLOR")
@@ -218,17 +251,12 @@ def setcolor_command(word, word_eol, userdata):
             dmsg("Saving permacolortable...")
 
             try:
-                f = open(datafile, "wb")
-                pickle.dump(permacolortable, f)
-                f.close()
-            except BaseException as e:
-                omsg("There was an error trying to save permacolortable:", "ERR_FILEWRITE")
-                omsg(e, "ERR_FILEWRITE")
-                omsg("The file path we were trying to write to was:", "ERR_FILEWRITE")
-                omsg(os.path.abspath(datafile), "ERR_FILEWRITE")
+                save_colors()
+            except RuntimeError as e:
+                omsg(e, "ERR_SAVE")
 
         else:
-            omsg("Not a valid colour! Please pick one between 0 and 31. See the 'Preferences...' for the list of colours.", "ERROR")
+            omsg("Not a valid colour! Please pick one between 0 and 99. See the 'Preferences...' for the list of colours.", "ERROR")
 
     else:
         omsg("Too many parameters, guy!","ERRNOR")
@@ -340,8 +368,8 @@ def message_callback(word, word_eol, userdata, attributes):
         dmsg("The time attribute for this event is {}".format(attributes.time), "PRINTEVENT")
         dmsg("COLORTABLE length = %d" % len(chancolortable), "PRINTEVENT")
 
-        chan = hexchat.get_info("channel")
-        net = hexchat.get_info("network")
+        chan = hexchat.get_info("channel") or ""
+        net = hexchat.get_info("network") or hexchat.get_info("server") or ""
         ctx = hexchat.get_context()
         if net not in chancolortable:
             # create an empty network entry
@@ -373,8 +401,8 @@ def change_nick_callback(word, word_eol, userdata, attributes):
     # we don't need to occupy a new entry in the table if someone changes their nick.
     # We replace their old entry with the new nick.
     oldnick, newnick = word
-    chan = hexchat.get_info("channel")
-    net = hexchat.get_info("network")
+    chan = hexchat.get_info("channel") or ""
+    net = hexchat.get_info("network") or hexchat.get_info("server") or ""
     
     net_table = chancolortable.get(net)
     if net_table:
@@ -389,10 +417,7 @@ def change_nick_callback(word, word_eol, userdata, attributes):
 
 ########## HOOK IT UP ###########
 
-try:
-    permacolortable = pickle.load(open(datafile,"rb"))
-except:
-    pass
+permacolortable = load_colors()
 
 hexchat.hook_print_attrs("Channel Message", message_callback, "Channel Message", priority=hexchat.PRI_HIGHEST)
 hexchat.hook_print_attrs("Channel Action", message_callback, "Channel Action", priority=hexchat.PRI_HIGHEST)
