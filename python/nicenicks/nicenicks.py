@@ -34,7 +34,7 @@
 from __future__ import print_function
 
 __module_name__ = "nicenicks"
-__module_version__ = "0.09"
+__module_version__ = "0.10"
 __module_description__ = "Sweet-ass nick colouring."
 
 from collections import defaultdict
