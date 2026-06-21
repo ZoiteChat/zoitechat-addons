@@ -1,0 +1,64 @@
+REIgnore
+============
+
+A HexChat and ZoiteChat plugin which allows regex /ignore patterns
+
+## Synopsis
+/REIGNORE [ADD|REMOVE|LIST|CLEAR] <mask> <types> <options> <pattern>
+
+ADD - Add a new /reignore entry. This is the default action.
+
+REMOVE - REMOVE a matching /reignore entry.
+
+LIST - List all matching /reignore entries.
+
+CLEAR - Clear all /reignore entries, functionally equivalent to
+	`/reignore REMOVE *!*@*`
+
+mask: Hostmask to match for the ignore.  This accepts wildcards * and ? and will
+	match against nick!ident@host.  There are also extban-style matches that
+	work here (see below).
+
+types: One of PRIV, CHAN, NOTI, CTCP, DCC, INVI, ALL (currently DCC and INVI are
+	not implemented)
+
+options: NOSAVE, QUIET.
+
+pattern: A regular expression pattern that must be matched for a message to be
+	ignored.
+
+Extban-style matches - The following masks are also possible:
+
+$a: Matches a logged in account name.
+
+$h: Matches the user's hostname in the form user@host.
+
+$n: Matches the user's nickname.
+
+$p: Matches any prefix such as @ or +.
+
+$r: Matches the user's real name.
+
+$x: Matches the full user!ident@hostname#gecos for the user.
+
+If you follow the $ with a ~ character it reverses the sense of the match.
+Examples:
+
+Match the username "pj":
+$a:pj
+
+Match any user who is not a channel op:
+$~:@
+
+Match any user who does not have ops or voice in the channel:
+$~p:?
+
+Match anyone with the real name of "Joe Bloggs":
+$r:Joe Bloggs
+
+Match any user who is not logged in:
+$a:
+
+## Requirements
+
+This plugin requires: perl, JSON (or JSON::PP), Text::Glob
